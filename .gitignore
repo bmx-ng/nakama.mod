@@ -1,0 +1,10 @@
+.DS_Store
+.bmx/
+*.a
+*.bmxbuild
+*.bmxbuild.stamp
+*.i
+*.i2
+sdk.mod/tests/test
+sdk.mod/tests/integration_auth
+sdk.mod/tests/integration_match
