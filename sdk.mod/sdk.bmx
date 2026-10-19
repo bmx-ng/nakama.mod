@@ -59,6 +59,25 @@ Extern
 	Function bmx_nakama_client_received_opcode:Long(handle:Byte Ptr)
 	Function bmx_nakama_client_received_data:Byte Ptr(handle:Byte Ptr)
 	Function bmx_nakama_client_received_sender_id:Byte Ptr(handle:Byte Ptr)
+	Function bmx_nakama_client_cancel_matchmaker:Int(handle:Byte Ptr)
+	Function bmx_nakama_client_match_player_count:Int(handle:Byte Ptr)
+	Function bmx_nakama_client_match_player_user_id:Byte Ptr(handle:Byte Ptr, index:Int)
+	Function bmx_nakama_client_match_player_session_id:Byte Ptr(handle:Byte Ptr, index:Int)
+	Function bmx_nakama_client_match_player_username:Byte Ptr(handle:Byte Ptr, index:Int)
+	Function bmx_nakama_client_send_match_data_bytes:Int(handle:Byte Ptr, opCode:Long, data:Byte Ptr, length:Size_T, targetSessionId:Byte Ptr)
+	Function bmx_nakama_client_leave_match:Int(handle:Byte Ptr)
+	Function bmx_nakama_client_socket_disconnect(handle:Byte Ptr)
+	Function bmx_nakama_client_poll_event:Int(handle:Byte Ptr)
+	Function bmx_nakama_client_event_kind:Int(handle:Byte Ptr)
+	Function bmx_nakama_client_event_code:Int(handle:Byte Ptr)
+	Function bmx_nakama_client_event_opcode:Long(handle:Byte Ptr)
+	Function bmx_nakama_client_event_subject:Byte Ptr(handle:Byte Ptr)
+	Function bmx_nakama_client_event_user_id:Byte Ptr(handle:Byte Ptr)
+	Function bmx_nakama_client_event_session_id:Byte Ptr(handle:Byte Ptr)
+	Function bmx_nakama_client_event_username:Byte Ptr(handle:Byte Ptr)
+	Function bmx_nakama_client_event_data:Byte Ptr(handle:Byte Ptr)
+	Function bmx_nakama_client_event_data_length:Size_T(handle:Byte Ptr)
+	Function bmx_nakama_client_dropped_events:ULong(handle:Byte Ptr)
 End Extern
 
 Const NAKAMA_AUTHENTICATION_IDLE:Int = 0
@@ -77,6 +96,39 @@ Const NAKAMA_MATCH_SEARCHING:Int = 1
 Const NAKAMA_MATCH_JOINING:Int = 2
 Const NAKAMA_MATCH_JOINED:Int = 3
 Const NAKAMA_MATCH_FAILED:Int = 4
+Const NAKAMA_MATCH_CANCELLED:Int = 5
+
+Enum ENakamaEventKind:Int
+	None
+	SocketConnected
+	SocketDisconnected
+	Error
+	MatchmakerTicket
+	MatchmakerMatched
+	MatchJoined
+	MatchPresenceJoined
+	MatchPresenceLeft
+	MatchData
+	MatchmakingCancelled
+	MatchLeft
+End Enum
+
+Struct SNakamaMatchPlayer
+	Field userId:String
+	Field sessionId:String
+	Field username:String
+End Struct
+
+Struct SNakamaEvent
+	Field kind:ENakamaEventKind
+	Field code:Int
+	Field opCode:Long
+	Field subject:String
+	Field userId:String
+	Field sessionId:String
+	Field username:String
+	Field data:Byte[]
+End Struct
 
 Function NakamaSdkVersion:String()
 	Return String.FromUTF8String(bmx_nakama_sdk_version())
@@ -165,6 +217,11 @@ Type TNakamaClient
 		Return bmx_nakama_client_add_matchmaker(handle, minCount, maxCount)
 	End Method
 
+	Method CancelMatchmaker:Int()
+		If Not handle Then Return False
+		Return bmx_nakama_client_cancel_matchmaker(handle)
+	End Method
+
 	Method MatchState:Int()
 		If Not handle Then Return NAKAMA_MATCH_FAILED
 		Return bmx_nakama_client_match_state(handle)
@@ -206,6 +263,65 @@ Type TNakamaClient
 	Method ReceivedSenderId:String()
 		If Not handle Then Return ""
 		Return String.FromUTF8String(bmx_nakama_client_received_sender_id(handle))
+	End Method
+
+	Method MatchPlayerCount:Int()
+		If Not handle Then Return 0
+		Return bmx_nakama_client_match_player_count(handle)
+	End Method
+
+	Method MatchPlayer:SNakamaMatchPlayer(index:Int)
+		Local result:SNakamaMatchPlayer
+		If Not handle Or index < 0 Or index >= MatchPlayerCount() Then Return result
+		result.userId = String.FromUTF8String(bmx_nakama_client_match_player_user_id(handle, index))
+		result.sessionId = String.FromUTF8String(bmx_nakama_client_match_player_session_id(handle, index))
+		result.username = String.FromUTF8String(bmx_nakama_client_match_player_username(handle, index))
+		Return result
+	End Method
+
+	Method SendMatchDataBytes:Int(opCode:Long, data:Byte Ptr, length:Size_T, targetSessionId:String = "")
+		If Not handle Or (length > 0 And Not data) Then Return False
+		Local targetUtf8:Byte Ptr = targetSessionId.ToUTF8String()
+		Local sent:Int = bmx_nakama_client_send_match_data_bytes(handle, opCode, data, length, targetUtf8)
+		MemFree(targetUtf8)
+		Return sent
+	End Method
+
+	Method LeaveMatch:Int()
+		If Not handle Then Return False
+		Return bmx_nakama_client_leave_match(handle)
+	End Method
+
+	Method DisconnectSocket()
+		If handle Then bmx_nakama_client_socket_disconnect(handle)
+	End Method
+
+	Method Poll:Int(event:SNakamaEvent Var)
+		If Not handle Or Not bmx_nakama_client_poll_event(handle) Then
+			event = New SNakamaEvent
+			Return False
+		End If
+		event = New SNakamaEvent
+		event.kind = ENakamaEventKind(bmx_nakama_client_event_kind(handle))
+		event.code = bmx_nakama_client_event_code(handle)
+		event.opCode = bmx_nakama_client_event_opcode(handle)
+		event.subject = String.FromUTF8String(bmx_nakama_client_event_subject(handle))
+		event.userId = String.FromUTF8String(bmx_nakama_client_event_user_id(handle))
+		event.sessionId = String.FromUTF8String(bmx_nakama_client_event_session_id(handle))
+		event.username = String.FromUTF8String(bmx_nakama_client_event_username(handle))
+		Local length:Size_T = bmx_nakama_client_event_data_length(handle)
+		If length Then
+			event.data = New Byte[Int(length)]
+			MemCopy(Byte Ptr(event.data), bmx_nakama_client_event_data(handle), length)
+		Else
+			event.data = New Byte[0]
+		End If
+		Return True
+	End Method
+
+	Method DroppedEvents:ULong()
+		If Not handle Then Return 0
+		Return bmx_nakama_client_dropped_events(handle)
 	End Method
 
 	Method Free()
