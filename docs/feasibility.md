@@ -26,36 +26,38 @@ the integration checks generated C++ into source control instead.
 - wslay `1.1.1` (MIT).
 - HTTP/TLS and zlib are supplied by existing BlitzMax modules.
 
-## Build evidence
+## Build and test evidence
 
 - Upstream current source built successfully as a universal macOS arm64/x86_64
   SDK after raising its obsolete 10.15 deployment target for Xcode 27.
-- A Windows x64 cross-build compiled protobuf, RapidJSON, curl/Schannel, wslay,
-  all generated Nakama API sources, and all 35 selected Nakama translation
-  units with MinGW GCC. The final link succeeded after placing `ws2_32` after
-  static wslay. No MSVC object or C++ ABI is involved.
-- `Nakama.Protobuf` builds under bmk in debug and release configurations.
-- `Nakama.SDK` builds under bmk in debug and release configurations against
-  the existing `Net.libcurl`/mbedTLS stack.
+- Native macOS arm64 and Windows x64 MinGW builds compile `Nakama.Protobuf` and
+  `Nakama.SDK` under bmk in debug and release configurations against the
+  existing `Net.libcurl`/mbedTLS stack. No MSVC object, Nakama DLL, or import
+  library is involved.
 - The deterministic SDK test creates, ticks, and destroys a client without a
   server, and verifies the pinned version.
+- The disposable local server tests device authentication, two-client realtime
+  matchmaking, relayed match join, and match data exchange on macOS and native
+  Windows.
+- The GameNet integration test completes matchmaking, transport handoff, a
+  `TNetSession` host/client handshake, and application message exchange. It
+  also checks cancellation and incompatible matchmaking-property isolation.
 
-Windows execution and Linux native builds still require their native hosts or
-CI before the module is advertised as released on those platforms. The MinGW
-compile/link proof removes the main source-compatibility risk but does not
-replace a WSS runtime test on Windows.
+Linux native builds, macOS x64 execution, and WSS certificate handling have not
+yet been validated. The current live suite uses loopback HTTP and WebSocket
+connections rather than TLS.
 
 ## GameNet mapping
 
 ### Direct fit
 
-- `Open`: restore or receive a provider-specific Nakama session, connect the
-  real-time socket, and expose the Nakama user id/username as `LocalPlayer`.
+- `Open`: authenticate a device, connect the real-time socket, and expose the
+  Nakama user id/username as `LocalPlayer`.
 - `StartMatchmaking`: call `addMatchmaker`; retain the ticket by GameNet
   request id.
-- `CancelOperation`: for matchmaking, call `removeMatchmaker`, suppress late
-  success callbacks by generation, leave any match won by a cancel race, and
-  finish with `MatchmakingCancelled`.
+- `CancelOperation`: for matchmaking, call `removeMatchmaker`, including when
+  cancellation is requested before the ticket callback, and finish with
+  `MatchmakingCancelled`.
 - Match transport: map match presence joins/leaves to peer events and match
   data to GameNet packets. Nakama can direct a message to selected presences.
 - Pumping: call the Nakama client and realtime-client `tick()` functions from
@@ -97,45 +99,44 @@ advertised until the runtime implements them.
 
 `GameNet.OnlineFlow` uses the generic `CancelOperation()` path. The adapter must
 keep the original operation alive until cancellation is settled, emit exactly
-one terminal event, and undo native success that arrives after cancellation.
-`CancelMatchmaking()` remains a compatibility wrapper around the same ticket
-logic.
+one terminal event, and defer removal when cancellation precedes the Nakama
+ticket callback. Once Nakama has begun joining a matched result, cancellation
+is rejected rather than pretending that the match was cancelled.
+`CancelMatchmaking()` remains a compatibility wrapper around the same logic.
 
 The service and a transferred match transport share one real-time socket. A
 reference-counted dispatch context must own that socket so service polling,
 transport polling, `Close()`, and `TakeMatchTransport()` cannot race or consume
 each other's callbacks.
 
-## Staged implementation
+## Implementation status
 
-1. **Native foundation (started)**
-   Build every dependency locally, expose only a C ABI, create/tick/destroy a
-   client, and verify the pinned version without network access.
-2. **Client/session wrapper (started)**
-   Device authentication, session identity, realtime socket lifecycle, and
-   error conversion are exposed and covered by the disposable local-server
-   test. Add custom/email authentication, session restoration and refresh,
-   main-thread event queues, and
-   deterministic fake transport tests.
-3. **Smallest useful GameNet slice**
-   Implement `Open`, `Close`, `Pump`, identity, matchmaking, generic
-   cancellation, matched-token join, `MatchReady`, and one-shot transport
-   handoff. Initially advertise only Matchmaking and MatchTransport.
-4. **Match transport**
-   Add peer generations, presence events, a reserved wire envelope/opcode,
-   directed sends, size limits, leave/disconnect behavior, and reconnection
-   cleanup. Test cancellation-vs-match races and late callbacks deterministically.
-5. **Integration smoke test (started)**
-   The pinned Docker Compose harness now authenticates two BlitzMax clients,
-   connects realtime sockets, matchmakes them, joins a relayed match, and
-   exchanges an opcode-tagged message. Extend it to construct GameNet
-   host/client sessions and exchange a GameNet user message through the adapter.
-6. **Runtime-backed lobby support**
+1. **Native foundation — complete for the tested desktop targets.**
+   Every client dependency builds locally, the BlitzMax surface crosses a C
+   ABI, and no build-time package manager or code generator is required.
+2. **Initial client/session wrapper — complete.**
+   Device authentication, session identity, realtime socket lifecycle, error
+   conversion, bounded event queues, and binary match data are exposed.
+   Custom/email authentication, session restoration, and refresh are deferred.
+3. **Smallest useful GameNet slice — complete.**
+   `Open`, `Close`, `Pump`, identity, matchmaking, generic cancellation,
+   matched-token join, `MatchReady`, and one-shot transport handoff advertise
+   only the implemented Matchmaking and MatchTransport capabilities.
+4. **Match transport — complete for non-restoring matches.**
+   The adapter includes peer generations, presence events, a reserved wire
+   envelope/opcode, directed sends, size limits, leave/disconnect behavior,
+   bounded queues, and deterministic backend tests. Unexpected socket loss is
+   terminal; transparent reconnection and roster restoration are deferred.
+5. **Integration suite — complete for the initial slice.**
+   The Docker Compose harness exercises both the SDK and GameNet paths through
+   a complete two-client `TNetSession` exchange.
+6. **Runtime-backed lobby support — deferred.**
    Add a small TypeScript, Go, or Lua Nakama runtime package for create/list/
    join/start, labels, roster authority, invitations, and reconnect grace.
-7. **Release matrix**
-   Run native macOS and Linux tests plus native Windows MinGW compile/link/WSS
-   tests. Record licenses and test both debug and release applications.
+7. **Release hardening — remaining.**
+   Add repeatable clean-machine automation, validate Linux and macOS x64, and
+   exercise WSS certificate handling. Continue testing debug and release module
+   builds on macOS arm64 and Windows MinGW x64.
 
 ## Main risks
 
