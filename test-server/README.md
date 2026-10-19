@@ -12,8 +12,10 @@ From the `nakama.mod` repository, run:
 
 The runner waits for both services to become healthy, builds the release-mode
 BlitzMax tests, authenticates devices through `Nakama.SDK`, connects two
-realtime sockets, matchmakes the clients into a relayed match, exchanges a
-message, and then stops the services and removes the isolated database volume.
+realtime sockets, matchmakes the clients into a relayed match, and exchanges a
+message. It then repeats the path through `GameNet.Nakama`, including online
+service handoff, a complete `TNetSession` handshake, and a framed game message,
+before stopping the services and removing the isolated database volume.
 
 The Nakama console is available at `http://127.0.0.1:7351` while the stack is
 running. The local defaults are suitable only for this test environment.
