@@ -46,6 +46,7 @@ struct NakamaClientHandle {
     std::string errorMessage;
     std::string matchmakerTicket;
     std::string matchId;
+    std::string matchSelfSessionId;
     std::vector<Nakama::NMatchmakerUser> matchedUsers;
     bool matchmakerCancellationPending = false;
     std::deque<NakamaEvent> events;
@@ -294,6 +295,7 @@ int bmx_nakama_client_socket_connect(void* value) {
             }
 
             handle->matchedUsers = matched->users;
+            handle->matchSelfSessionId = matched->self.presence.sessionId;
             bool hasSelf = false;
             for (const auto& user : handle->matchedUsers) {
                 if (user.presence.sessionId == matched->self.presence.sessionId) {
@@ -391,6 +393,7 @@ int bmx_nakama_client_add_matchmaker(void* value, int minCount, int maxCount) {
     handle->matchState = MatchSearching;
     handle->matchmakerTicket.clear();
     handle->matchId.clear();
+    handle->matchSelfSessionId.clear();
     handle->matchedUsers.clear();
     handle->matchmakerCancellationPending = false;
     handle->errorCode = 0;
@@ -517,6 +520,11 @@ int bmx_nakama_client_match_player_count(void* value) {
     return handle ? static_cast<int>(handle->matchedUsers.size()) : 0;
 }
 
+const char* bmx_nakama_client_match_self_session_id(void* value) {
+    auto* handle = static_cast<NakamaClientHandle*>(value);
+    return handle ? handle->matchSelfSessionId.c_str() : "";
+}
+
 const char* bmx_nakama_client_match_player_user_id(void* value, int index) {
     auto* handle = static_cast<NakamaClientHandle*>(value);
     if (!handle || index < 0 || index >= static_cast<int>(handle->matchedUsers.size())) return "";
@@ -575,6 +583,7 @@ int bmx_nakama_client_leave_match(void* value) {
         matchId,
         [handle, matchId]() {
             handle->matchId.clear();
+            handle->matchSelfSessionId.clear();
             handle->matchedUsers.clear();
             handle->matchState = MatchIdle;
             NakamaEvent event;

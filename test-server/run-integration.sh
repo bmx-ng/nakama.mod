@@ -30,4 +30,5 @@ if ! compose --project-name "$compose_project" --file "$script_dir/docker-compos
 fi
 "$blitzmax_dir/bin/bmk" makeapp -r -x "$module_dir/sdk.mod/tests/integration_auth.bmx"
 "$blitzmax_dir/bin/bmk" makeapp -r -x "$module_dir/sdk.mod/tests/integration_match.bmx"
+"$blitzmax_dir/bin/bmk" makeapp -r -x -o /tmp/gamenet_nakama_unit "$blitzmax_dir/mod/gamenet.mod/nakama.mod/tests/test.bmx"
 "$blitzmax_dir/bin/bmk" makeapp -r -x -o /tmp/gamenet_nakama_integration "$blitzmax_dir/mod/gamenet.mod/nakama.mod/tests/integration.bmx"

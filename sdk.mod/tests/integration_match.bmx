@@ -46,6 +46,8 @@ Wend
 AssertTrue(first.MatchState() = NAKAMA_MATCH_JOINED, "first match join failed: " + first.ErrorMessage())
 AssertTrue(second.MatchState() = NAKAMA_MATCH_JOINED, "second match join failed: " + second.ErrorMessage())
 AssertTrue(first.MatchId() = second.MatchId(), "clients joined different matches")
+AssertTrue(first.MatchSelfSessionId() <> "" And second.MatchSelfSessionId() <> "", "matched self session ids are missing")
+AssertTrue(first.MatchSelfSessionId() <> second.MatchSelfSessionId(), "matched clients have the same session id")
 
 AssertTrue(first.SendMatchData(42, "hello from BlitzMax"), "match data send failed")
 deadline = MilliSecs() + 5000

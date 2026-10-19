@@ -61,6 +61,7 @@ Extern
 	Function bmx_nakama_client_received_sender_id:Byte Ptr(handle:Byte Ptr)
 	Function bmx_nakama_client_cancel_matchmaker:Int(handle:Byte Ptr)
 	Function bmx_nakama_client_match_player_count:Int(handle:Byte Ptr)
+	Function bmx_nakama_client_match_self_session_id:Byte Ptr(handle:Byte Ptr)
 	Function bmx_nakama_client_match_player_user_id:Byte Ptr(handle:Byte Ptr, index:Int)
 	Function bmx_nakama_client_match_player_session_id:Byte Ptr(handle:Byte Ptr, index:Int)
 	Function bmx_nakama_client_match_player_username:Byte Ptr(handle:Byte Ptr, index:Int)
@@ -268,6 +269,11 @@ Type TNakamaClient
 	Method MatchPlayerCount:Int()
 		If Not handle Then Return 0
 		Return bmx_nakama_client_match_player_count(handle)
+	End Method
+
+	Method MatchSelfSessionId:String()
+		If Not handle Then Return ""
+		Return String.FromUTF8String(bmx_nakama_client_match_self_session_id(handle))
 	End Method
 
 	Method MatchPlayer:SNakamaMatchPlayer(index:Int)
