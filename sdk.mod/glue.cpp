@@ -382,13 +382,30 @@ int bmx_nakama_client_socket_state(void* value) {
     return handle ? handle->socketState : SocketFailed;
 }
 
-int bmx_nakama_client_add_matchmaker(void* value, int minCount, int maxCount) {
+int bmx_nakama_client_add_matchmaker(
+    void* value,
+    int minCount,
+    int maxCount,
+    const char* query,
+    const char* const* propertyKeys,
+    const char* const* propertyValues,
+    int propertyCount) {
     auto* handle = static_cast<NakamaClientHandle*>(value);
     if (!handle || !handle->realtimeClient || handle->socketState != SocketConnected ||
         minCount < 2 || maxCount < minCount || handle->matchState == MatchSearching ||
-        handle->matchState == MatchJoining) {
+        handle->matchState == MatchJoining || propertyCount < 0 ||
+        (propertyCount > 0 && (!propertyKeys || !propertyValues))) {
         return 0;
     }
+
+    Nakama::NStringMap stringProperties;
+    for (int index = 0; index < propertyCount; ++index) {
+        if (!propertyKeys[index] || !propertyKeys[index][0] || !propertyValues[index]) return 0;
+        stringProperties[propertyKeys[index]] = propertyValues[index];
+    }
+
+    std::optional<std::string> matchQuery;
+    if (query && query[0]) matchQuery = std::string(query);
 
     handle->matchState = MatchSearching;
     handle->matchmakerTicket.clear();
@@ -401,8 +418,8 @@ int bmx_nakama_client_add_matchmaker(void* value, int minCount, int maxCount) {
     handle->realtimeClient->addMatchmaker(
         minCount,
         maxCount,
-        std::nullopt,
-        {},
+        matchQuery,
+        stringProperties,
         {},
         std::nullopt,
         [handle](const Nakama::NMatchmakerTicket& ticket) {

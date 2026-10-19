@@ -50,7 +50,7 @@ Extern
 	Function bmx_nakama_client_session_created:Int(handle:Byte Ptr)
 	Function bmx_nakama_client_socket_connect:Int(handle:Byte Ptr)
 	Function bmx_nakama_client_socket_state:Int(handle:Byte Ptr)
-	Function bmx_nakama_client_add_matchmaker:Int(handle:Byte Ptr, minCount:Int, maxCount:Int)
+	Function bmx_nakama_client_add_matchmaker:Int(handle:Byte Ptr, minCount:Int, maxCount:Int, query:Byte Ptr, propertyKeys:Byte Ptr Ptr, propertyValues:Byte Ptr Ptr, propertyCount:Int)
 	Function bmx_nakama_client_match_state:Int(handle:Byte Ptr)
 	Function bmx_nakama_client_match_id:Byte Ptr(handle:Byte Ptr)
 	Function bmx_nakama_client_matchmaker_ticket:Byte Ptr(handle:Byte Ptr)
@@ -214,8 +214,36 @@ Type TNakamaClient
 	End Method
 
 	Method AddMatchmaker:Int(minCount:Int = 2, maxCount:Int = 2)
+		Return AddMatchmakerProperties(minCount, maxCount, "", New String[0], New String[0])
+	End Method
+
+	Method AddMatchmakerProperties:Int(minCount:Int, maxCount:Int, query:String, propertyKeys:String[], propertyValues:String[])
 		If Not handle Then Return False
-		Return bmx_nakama_client_add_matchmaker(handle, minCount, maxCount)
+		Local propertyCount:Int
+		If propertyKeys Then propertyCount = propertyKeys.Length
+		Local valueCount:Int
+		If propertyValues Then valueCount = propertyValues.Length
+		If propertyCount <> valueCount Then Return False
+		Local queryUtf8:Byte Ptr = query.ToUTF8String()
+		Local keyPointers:Byte Ptr[] = New Byte Ptr[propertyCount]
+		Local valuePointers:Byte Ptr[] = New Byte Ptr[propertyCount]
+		For Local index:Int = 0 Until propertyCount
+			keyPointers[index] = propertyKeys[index].ToUTF8String()
+			valuePointers[index] = propertyValues[index].ToUTF8String()
+		Next
+		Local keysAddress:Byte Ptr Ptr
+		Local valuesAddress:Byte Ptr Ptr
+		If propertyCount Then
+			keysAddress = Byte Ptr Ptr(keyPointers)
+			valuesAddress = Byte Ptr Ptr(valuePointers)
+		End If
+		Local started:Int = bmx_nakama_client_add_matchmaker(handle, minCount, maxCount, queryUtf8, keysAddress, valuesAddress, propertyCount)
+		For Local index:Int = 0 Until propertyCount
+			MemFree(keyPointers[index])
+			MemFree(valuePointers[index])
+		Next
+		MemFree(queryUtf8)
+		Return started
 	End Method
 
 	Method CancelMatchmaker:Int()
