@@ -12,6 +12,10 @@ repository. The first foundational modules are:
   and a small BlitzMax-safe C ABI. It reuses the existing `Net.libcurl` TLS
   stack.
 
+The complete client stack builds from these local sources with BlitzMax's
+MinGW x64 toolchain on Windows; no Nakama DLL or pre-built import library is
+required.
+
 Build and run the deterministic foundation test from the BlitzMax root:
 
 ```text
